@@ -8,6 +8,7 @@ function mapUser(data) {
   if (!data) return null;
   return {
     _id: data._id,
+    username: data.username || "",
     name: data.name,
     email: data.email,
     phone: data.phone || "",
@@ -46,8 +47,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = useCallback(async (email, password, role) => {
-    const res = await api.post("/api/auth/login", { email, password, role });
+  const login = useCallback(async (username, password, role) => {
+    const payload = { password, role };
+    if (username.includes("@")) {
+      payload.email = username;
+    } else {
+      payload.username = username;
+    }
+    const res = await api.post("/api/auth/login", payload);
     const data = res.data;
     localStorage.setItem("token", data.token);
     setToken(data.token);

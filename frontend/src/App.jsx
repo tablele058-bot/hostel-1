@@ -21,6 +21,9 @@ import Staff from "./pages/seller/Staff";
 import Reports from "./pages/seller/Reports";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
+import SearchOwners from "./pages/shared/SearchOwners";
+import OwnerProfile from "./pages/shared/OwnerProfile";
+import Requests from "./pages/shared/Requests";
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
@@ -56,6 +59,9 @@ function AppContent() {
         <Route path="/profile" element={<ProtectedRoute allowedRoles={["viewer", "owner", "admin"]}><Profile /></ProtectedRoute>} />
         <Route path="/wishlist" element={<ProtectedRoute allowedRoles={["viewer"]}><Wishlist /></ProtectedRoute>} />
         <Route path="/my-rent" element={<ProtectedRoute allowedRoles={["viewer"]}><MyRent /></ProtectedRoute>} />
+        <Route path="/search" element={<ProtectedRoute allowedRoles={["viewer"]}><SearchOwners /></ProtectedRoute>} />
+        <Route path="/owner/:id" element={<OwnerProfile />} />
+        <Route path="/requests" element={<ProtectedRoute allowedRoles={["viewer", "owner"]}><Requests /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["owner"]}><SellerDashboard /></ProtectedRoute>} />
         <Route path="/add-property" element={<ProtectedRoute allowedRoles={["owner"]}><AddProperty /></ProtectedRoute>} />
         <Route path="/edit-property/:id" element={<ProtectedRoute allowedRoles={["owner"]}><EditProperty /></ProtectedRoute>} />

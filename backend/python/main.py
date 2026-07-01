@@ -83,14 +83,16 @@ def get_current_user(authorization: Optional[str] = Header(None)):
 # ── Models ──
 
 class RegisterBody(BaseModel):
+    username: str
     name: str
-    email: str
+    email: Optional[str] = ""
     password: str
     phone: Optional[str] = ""
     role: str = "viewer"
 
 class LoginBody(BaseModel):
-    email: str
+    username: Optional[str] = None
+    email: Optional[str] = None
     password: str
     role: Optional[str] = None
 
@@ -154,12 +156,22 @@ def register(body: RegisterBody):
     users = get_collection("users")
     if users is None:
         raise HTTPException(500, "Database unavailable")
-    existing = users.find_one({"email": body.email})
-    if existing:
-        raise HTTPException(400, "Email already registered")
+
+    if not body.username or not body.username.isalpha():
+        raise HTTPException(400, "Username must contain only alphabets (A-Z, a-z)")
+
+    existing_username = users.find_one({"username": body.username})
+    if existing_username:
+        raise HTTPException(400, "Username already taken")
+    if body.email:
+        existing_email = users.find_one({"email": body.email})
+        if existing_email:
+            raise HTTPException(400, "Email already registered")
+
     user = {
+        "username": body.username.lower(),
         "name": body.name,
-        "email": body.email,
+        "email": body.email or "",
         "password": hash_password(body.password),
         "phone": body.phone or "",
         "role": body.role or "viewer",
@@ -171,6 +183,7 @@ def register(body: RegisterBody):
     token = create_token(str(result.inserted_id))
     return {
         "_id": str(result.inserted_id),
+        "username": user["username"],
         "name": user["name"],
         "email": user["email"],
         "phone": user["phone"],
@@ -185,17 +198,24 @@ def login(body: LoginBody):
     users = get_collection("users")
     if users is None:
         raise HTTPException(500, "Database unavailable")
-    user = users.find_one({"email": body.email})
+
+    user = None
+    if body.username:
+        user = users.find_one({"username": body.username.lower()})
+    elif body.email:
+        user = users.find_one({"email": body.email})
+
     if not user:
-        raise HTTPException(400, "Invalid email or password")
+        raise HTTPException(400, "Invalid username/email or password")
     if not verify_password(body.password, user["password"]):
-        raise HTTPException(400, "Invalid email or password")
+        raise HTTPException(400, "Invalid username/email or password")
     if body.role and user["role"] != body.role:
         users.update_one({"_id": user["_id"]}, {"$set": {"role": body.role}})
         user["role"] = body.role
     token = create_token(str(user["_id"]))
     return {
         "_id": str(user["_id"]),
+        "username": user.get("username", ""),
         "name": user["name"],
         "email": user["email"],
         "phone": user.get("phone", ""),
@@ -382,31 +402,35 @@ def get_tenants(propertyId: Optional[str] = Query(None)):
     return [serialize_doc(t) for t in cursor]
 
 @app.get("/api/tenants/my-rent")
-def get_my_rent(email: Optional[str] = Query(None)):
+def get_my_rent(user_id: str = Depends(get_current_user)):
+    connections = get_collection("connections")
     tenants = get_collection("tenants")
     payments_coll = get_collection("payments")
-    if tenants is None or payments_coll is None:
+    users = get_collection("users")
+    if connections is None or tenants is None or payments_coll is None:
         raise HTTPException(500, "Database unavailable")
-    if not email:
-        raise HTTPException(400, "Email is required")
-    tenant = tenants.find_one({"email": email, "status": "active"})
-    if not tenant:
-        raise HTTPException(404, "No active tenancy found for this email")
-    payments = list(payments_coll.find({"tenantId": str(tenant["_id"])}).sort("year", -1).sort("month", -1))
+    conn = connections.find_one({"tenantId": user_id, "status": "active"})
+    if not conn:
+        raise HTTPException(404, "No active tenancy found for your account")
+    tenant = tenants.find_one({"_id": ObjectId(conn.get("tenantId"))}) if conn.get("tenantId") else None
+    owner = users.find_one({"_id": ObjectId(conn["ownerId"])}, {"password": 0}) if conn.get("ownerId") else None
+    payments = list(payments_coll.find({"connectionId": str(conn["_id"])}).sort("year", -1).sort("month", -1))
     today = date.today()
-    due_day = tenant.get("rentDueDate", 1)
+    due_day = conn.get("rentDueDate", 1)
     rs = rent_status(due_day)
-    penalty = calculate_penalty(tenant.get("rentAmount", 0), rs["days"] if rs["status"] == "overdue" else 0)
+    penalty = calculate_penalty(conn.get("rentAmount", 0), rs["days"] if rs["status"] == "overdue" else 0)
     months_occupied = 1
-    if tenant.get("leaseStart"):
-        ls = datetime.fromisoformat(tenant["leaseStart"])
-        months_occupied = max(1, months_between(ls.date(), today) + 1)
-    total = total_due_for_period(tenant.get("rentAmount", 0), months_occupied, len(payments))
+    if conn.get("leaseStart"):
+        ls = datetime.fromisoformat(conn["leaseStart"]) if isinstance(conn["leaseStart"], str) else conn["leaseStart"]
+        months_occupied = max(1, months_between(ls.date() if hasattr(ls, 'date') else ls, today) + 1)
+    total = total_due_for_period(conn.get("rentAmount", 0), months_occupied, len(payments))
     lease_info = None
-    if tenant.get("leaseEnd"):
-        lease_info = lease_time_remaining(datetime.fromisoformat(tenant["leaseEnd"]).date())
+    if conn.get("leaseEnd"):
+        le = datetime.fromisoformat(conn["leaseEnd"]) if isinstance(conn["leaseEnd"], str) else conn["leaseEnd"]
+        lease_info = lease_time_remaining(le.date() if hasattr(le, 'date') else le)
     return {
-        "tenant": serialize_doc(tenant),
+        "connection": serialize_doc(conn),
+        "owner": serialize_doc(owner) if owner else None,
         "payments": [serialize_doc(p) for p in payments],
         "rentStatus": rs,
         "penalty": penalty,
@@ -711,7 +735,165 @@ def admin_delete_user(uid: str, user_id: str = Depends(admin_required)):
     users_col.delete_one({"_id": ObjectId(uid)})
     return {"success": True}
 
-# ── Inquiry Routes ──
+# ── Search / Social Routes ──
+
+@app.get("/api/search")
+def search_users(q: Optional[str] = Query(""), role: Optional[str] = Query("owner")):
+    users = get_collection("users")
+    if users is None:
+        raise HTTPException(500, "Database unavailable")
+    if not q:
+        return {"users": []}
+    filter_q = {
+        "role": role,
+        "username": {"$regex": f"^{q}", "$options": "i"},
+    }
+    cursor = users.find(filter_q, {"password": 0, "email": 0, "phone": 0}).limit(20)
+    results = []
+    for u in cursor:
+        doc = serialize_doc(u)
+        doc.pop("password", None)
+        results.append(doc)
+    return {"users": results}
+
+# ── Request Routes ──
+
+class RequestBody(BaseModel):
+    toUserId: str
+    roomId: Optional[str] = None
+
+@app.post("/api/requests")
+def send_request(body: RequestBody, user_id: str = Depends(get_current_user)):
+    requests = get_collection("requests")
+    if requests is None:
+        raise HTTPException(500, "Database unavailable")
+    existing = requests.find_one({"fromUserId": user_id, "toUserId": body.toUserId, "status": "pending"})
+    if existing:
+        raise HTTPException(400, "Request already sent")
+    req = {
+        "fromUserId": user_id,
+        "toUserId": body.toUserId,
+        "roomId": body.roomId or "",
+        "status": "pending",
+        "createdAt": datetime.utcnow(),
+    }
+    result = requests.insert_one(req)
+    return serialize_doc(requests.find_one({"_id": result.inserted_id}))
+
+@app.get("/api/requests")
+def get_requests(status: Optional[str] = Query(None), direction: Optional[str] = Query("received"), user_id: str = Depends(get_current_user)):
+    requests = get_collection("requests")
+    users = get_collection("users")
+    if requests is None or users is None:
+        raise HTTPException(500, "Database unavailable")
+    filter_q = {}
+    if direction == "received":
+        filter_q["toUserId"] = user_id
+    else:
+        filter_q["fromUserId"] = user_id
+    if status:
+        filter_q["status"] = status
+    cursor = requests.find(filter_q).sort("createdAt", -1)
+    results = []
+    for r in cursor:
+        doc = serialize_doc(r)
+        other_id = r["fromUserId"] if direction == "received" else r["toUserId"]
+        other = users.find_one({"_id": ObjectId(other_id)}, {"password": 0})
+        if other:
+            doc["otherUser"] = {"_id": str(other["_id"]), "username": other.get("username", ""), "name": other.get("name", ""), "phone": other.get("phone", "")}
+        results.append(doc)
+    return results
+
+@app.put("/api/requests/{req_id}")
+def update_request(req_id: str, body: dict, user_id: str = Depends(get_current_user)):
+    requests = get_collection("requests")
+    connections = get_collection("connections")
+    if requests is None or connections is None:
+        raise HTTPException(500, "Database unavailable")
+    req = requests.find_one({"_id": ObjectId(req_id)})
+    if not req:
+        raise HTTPException(404, "Request not found")
+    if str(req["toUserId"]) != user_id:
+        raise HTTPException(403, "Not authorized")
+    new_status = body.get("status")
+    if new_status not in ("accepted", "rejected"):
+        raise HTTPException(400, "Invalid status")
+    if new_status == "accepted":
+        conn = {
+            "ownerId": user_id,
+            "tenantId": req["fromUserId"],
+            "roomId": req.get("roomId", ""),
+            "rentAmount": body.get("rentAmount", 0),
+            "rentDueDate": body.get("rentDueDate", 1),
+            "deposit": body.get("deposit", 0),
+            "leaseStart": body.get("leaseStart", datetime.utcnow().isoformat()),
+            "leaseEnd": body.get("leaseEnd", ""),
+            "status": "active",
+            "createdAt": datetime.utcnow(),
+        }
+        connections.insert_one(conn)
+        if conn.get("roomId"):
+            rooms = get_collection("rooms")
+            if rooms:
+                rooms.update_one({"_id": ObjectId(conn["roomId"])}, {"$set": {"status": "occupied"}})
+    requests.update_one({"_id": ObjectId(req_id)}, {"$set": {"status": new_status}})
+    return {"success": True, "status": new_status}
+
+@app.delete("/api/requests/{req_id}")
+def delete_request(req_id: str, user_id: str = Depends(get_current_user)):
+    requests = get_collection("requests")
+    if requests is None:
+        raise HTTPException(500, "Database unavailable")
+    req = requests.find_one({"_id": ObjectId(req_id)})
+    if not req or (str(req["fromUserId"]) != user_id and str(req["toUserId"]) != user_id):
+        raise HTTPException(403, "Not authorized")
+    requests.delete_one({"_id": ObjectId(req_id)})
+    return {"success": True}
+
+# ── Connection Routes ──
+
+@app.get("/api/connections")
+def get_connections(user_id: str = Depends(get_current_user)):
+    connections = get_collection("connections")
+    users = get_collection("users")
+    if connections is None or users is None:
+        raise HTTPException(500, "Database unavailable")
+    user = users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(404, "User not found")
+    role = user.get("role", "viewer")
+    if role == "owner":
+        filter_q = {"ownerId": user_id}
+    else:
+        filter_q = {"tenantId": user_id, "status": "active"}
+    cursor = connections.find(filter_q).sort("createdAt", -1)
+    results = []
+    for c in cursor:
+        doc = serialize_doc(c)
+        other_id = c.get("tenantId") if role == "owner" else c.get("ownerId")
+        other = users.find_one({"_id": ObjectId(other_id)}, {"password": 0})
+        if other:
+            doc["otherUser"] = {"_id": str(other["_id"]), "username": other.get("username", ""), "name": other.get("name", ""), "phone": other.get("phone", "")}
+        results.append(doc)
+    return results
+
+@app.put("/api/connections/{conn_id}")
+def update_connection(conn_id: str, body: dict, user_id: str = Depends(get_current_user)):
+    connections = get_collection("connections")
+    if connections is None:
+        raise HTTPException(500, "Database unavailable")
+    conn = connections.find_one({"_id": ObjectId(conn_id)})
+    if not conn:
+        raise HTTPException(404, "Connection not found")
+    allowed = {"rentAmount", "rentDueDate", "deposit", "leaseEnd", "status"}
+    updates = {k: v for k, v in body.items() if k in allowed}
+    if updates.get("status") == "ended" and conn.get("roomId"):
+        rooms = get_collection("rooms")
+        if rooms:
+            rooms.update_one({"_id": ObjectId(conn["roomId"])}, {"$set": {"status": "vacant"}})
+    if updates:
+        connections.update_one({"_id": ObjectId(conn_id)}, {"$set": updates})
+    return serialize_doc(connections.find_one({"_id": ObjectId(conn_id)}))
 
 @app.post("/api/inquiry")
 def create_inquiry(body: dict):

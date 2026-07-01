@@ -80,6 +80,7 @@ const Navbar = () => {
           ]
         : [
             { name: "My Rent", path: "/my-rent" },
+            { name: "Search", path: "/search" },
             { name: "Browse PGs", path: "/properties" },
             { name: "Wishlist", path: "/wishlist" },
           ];
@@ -245,6 +246,7 @@ const Navbar = () => {
                 { name: "Tenants & Rent", path: "/tenants" },
                 { name: "Staff", path: "/staff" },
                 { name: "Reports", path: "/reports" },
+                { name: "Requests", path: "/requests" },
               ].map((link) => (
                 <Link
                   key={link.path}
@@ -284,8 +286,10 @@ const Navbar = () => {
             <div className="flex flex-col gap-1">
               {[
                 { name: "My Rent", path: "/my-rent" },
+                { name: "Search", path: "/search" },
                 { name: "Browse PGs", path: "/properties" },
                 { name: "Wishlist", path: "/wishlist" },
+                { name: "Requests", path: "/requests" },
               ].map((link) => (
                 <Link
                   key={link.path}

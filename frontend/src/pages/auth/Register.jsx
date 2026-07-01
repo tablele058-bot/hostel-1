@@ -9,6 +9,7 @@ const Register = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
+    username: "",
     name: "",
     email: "",
     password: "",
@@ -51,6 +52,21 @@ const Register = () => {
           {error && <div className={s.errorMessage}>{error}</div>}
 
           <form onSubmit={handleSubmit} className={s.form}>
+            <div>
+              <label className={s.label}>Username</label>
+              <input
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^a-zA-Z]/g, "");
+                  setFormData((prev) => ({ ...prev, username: val }));
+                }}
+                className={s.input}
+                placeholder="Choose a unique username (alphabets only)"
+                required
+              />
+            </div>
             <div>
               <label className={s.label}>Full Name</label>
               <input
