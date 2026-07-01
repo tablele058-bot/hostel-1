@@ -1,4 +1,7 @@
+import mongoose from "mongoose";
 
+const propertySchema = new mongoose.Schema(
+  {
     title: {
       type: String,
       required: true,
@@ -66,7 +69,6 @@
     seller: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
     isVerified: {
       type: Boolean,
@@ -77,4 +79,9 @@
       default: 0,
     },
     viewedBy: [{ type: String }],
- 
+  },
+  { timestamps: true }
+);
+
+const Property = mongoose.model("Property", propertySchema);
+export default Property;
