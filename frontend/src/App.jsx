@@ -11,6 +11,7 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import Contact from "./pages/shared/Contact";
 import Profile from "./pages/shared/Profile";
 import Wishlist from "./pages/buyer/Wishlist";
+import MyRent from "./pages/buyer/MyRent";
 import AddProperty from "./pages/seller/AddProperty";
 import EditProperty from "./pages/seller/EditProperty";
 import SellerDashboard from "./pages/seller/SellerDashboard";
@@ -54,6 +55,7 @@ function AppContent() {
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/profile" element={<ProtectedRoute allowedRoles={["viewer", "owner", "admin"]}><Profile /></ProtectedRoute>} />
         <Route path="/wishlist" element={<ProtectedRoute allowedRoles={["viewer"]}><Wishlist /></ProtectedRoute>} />
+        <Route path="/my-rent" element={<ProtectedRoute allowedRoles={["viewer"]}><MyRent /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["owner"]}><SellerDashboard /></ProtectedRoute>} />
         <Route path="/add-property" element={<ProtectedRoute allowedRoles={["owner"]}><AddProperty /></ProtectedRoute>} />
         <Route path="/edit-property/:id" element={<ProtectedRoute allowedRoles={["owner"]}><EditProperty /></ProtectedRoute>} />

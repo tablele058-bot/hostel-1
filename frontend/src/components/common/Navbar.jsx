@@ -79,9 +79,9 @@ const Navbar = () => {
             { name: "Users", path: "/admin/users" },
           ]
         : [
+            { name: "My Rent", path: "/my-rent" },
             { name: "Browse PGs", path: "/properties" },
             { name: "Wishlist", path: "/wishlist" },
-            { name: "Contact", path: "/contact" },
           ];
 
   return (
@@ -283,6 +283,7 @@ const Navbar = () => {
             <p className="text-[0.65rem] font-bold text-[#94a3b8] uppercase tracking-wider mb-2">Browse</p>
             <div className="flex flex-col gap-1">
               {[
+                { name: "My Rent", path: "/my-rent" },
                 { name: "Browse PGs", path: "/properties" },
                 { name: "Wishlist", path: "/wishlist" },
               ].map((link) => (
