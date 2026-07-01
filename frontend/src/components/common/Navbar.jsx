@@ -67,18 +67,22 @@ const Navbar = () => {
       ]
     : user.role === "owner"
       ? [
-          { name: "Home", path: "/" },
           { name: "Dashboard", path: "/dashboard" },
           { name: "My PGs", path: "/my-properties" },
-          { name: "Add PG", path: "/add-property" },
-          { name: "Contact", path: "/contact" },
+          { name: "Rooms", path: "/rooms" },
+          { name: "Tenants", path: "/tenants" },
+          { name: "Reports", path: "/reports" },
         ]
-      : [
-          { name: "Home", path: "/" },
-          { name: "Browse PGs", path: "/properties" },
-          { name: "Wishlist", path: "/wishlist" },
-          { name: "Contact", path: "/contact" },
-        ];
+      : user.role === "admin"
+        ? [
+            { name: "Dashboard", path: "/admin-dashboard" },
+            { name: "Users", path: "/admin/users" },
+          ]
+        : [
+            { name: "Browse PGs", path: "/properties" },
+            { name: "Wishlist", path: "/wishlist" },
+            { name: "Contact", path: "/contact" },
+          ];
 
   return (
     <>
@@ -117,16 +121,11 @@ const Navbar = () => {
                         </span>
                       )}
                     </Link>
-                  ) : (
-                    <>
-                      <Link to="/wishlist" className="text-text-main hover:text-primary transition-colors">
-                        <HiOutlineHeart size={22} />
-                      </Link>
-                      <Link to="/chat-messages" className="text-text-main hover:text-primary transition-colors">
-                        <HiMagnifyingGlass size={20} />
-                      </Link>
-                    </>
-                  )}
+                  ) : user.role === "viewer" ? (
+                    <Link to="/wishlist" className="text-text-main hover:text-primary transition-colors">
+                      <HiOutlineHeart size={22} />
+                    </Link>
+                  ) : null}
                   <div className="relative">
                     <button
                       onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -145,20 +144,15 @@ const Navbar = () => {
                           <p className="font-semibold text-sm text-text-main">{user.name}</p>
                           <p className="text-xs text-text-muted capitalize">{user.role}</p>
                         </div>
-                        <Link
-                          to={user.role === "owner" ? "/dashboard" : "/profile"}
-                          className="block px-4 py-2.5 text-sm text-text-main hover:bg-[#f8fafc] no-underline"
-                          onClick={() => setIsUserMenuOpen(false)}
-                        >
-                          {user.role === "owner" ? "Dashboard" : "Profile"}
-                        </Link>
-                        <Link
-                          to="/profile"
-                          className="block px-4 py-2.5 text-sm text-text-main hover:bg-[#f8fafc] no-underline"
-                          onClick={() => setIsUserMenuOpen(false)}
-                        >
-                          Profile
-                        </Link>
+                        {user.role === "owner" && (
+                          <Link
+                            to="/dashboard"
+                            className="block px-4 py-2.5 text-sm text-text-main hover:bg-[#f8fafc] no-underline"
+                            onClick={() => setIsUserMenuOpen(false)}
+                          >
+                            Dashboard
+                          </Link>
+                        )}
                         {user.role === "admin" && (
                           <Link
                             to="/admin-dashboard"
@@ -168,6 +162,13 @@ const Navbar = () => {
                             Admin Panel
                           </Link>
                         )}
+                        <Link
+                          to="/profile"
+                          className="block px-4 py-2.5 text-sm text-text-main hover:bg-[#f8fafc] no-underline"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          Profile
+                        </Link>
                         <div className="border-t border-[#f1f5f9] mt-1 pt-1">
                           <button
                             onClick={handleLogout}
@@ -237,10 +238,53 @@ const Navbar = () => {
             <p className="text-[0.65rem] font-bold text-[#94a3b8] uppercase tracking-wider mb-2">Management</p>
             <div className="flex flex-col gap-1">
               {[
+                { name: "Dashboard", path: "/dashboard" },
+                { name: "My PGs", path: "/my-properties" },
+                { name: "Add PG", path: "/add-property" },
                 { name: "Rooms", path: "/rooms" },
                 { name: "Tenants & Rent", path: "/tenants" },
                 { name: "Staff", path: "/staff" },
                 { name: "Reports", path: "/reports" },
+              ].map((link) => (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className="text-text-main no-underline font-semibold hover:text-primary transition-colors text-sm py-1.5"
+                  onClick={() => setIsDrawerOpen(false)}
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        {user?.role === "admin" && (
+          <div className="px-6 py-3 border-t border-[#f1f5f9]">
+            <p className="text-[0.65rem] font-bold text-[#94a3b8] uppercase tracking-wider mb-2">Admin</p>
+            <div className="flex flex-col gap-1">
+              {[
+                { name: "Dashboard", path: "/admin-dashboard" },
+                { name: "Users", path: "/admin/users" },
+              ].map((link) => (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className="text-text-main no-underline font-semibold hover:text-primary transition-colors text-sm py-1.5"
+                  onClick={() => setIsDrawerOpen(false)}
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        {user?.role === "viewer" && (
+          <div className="px-6 py-3 border-t border-[#f1f5f9]">
+            <p className="text-[0.65rem] font-bold text-[#94a3b8] uppercase tracking-wider mb-2">Browse</p>
+            <div className="flex flex-col gap-1">
+              {[
+                { name: "Browse PGs", path: "/properties" },
+                { name: "Wishlist", path: "/wishlist" },
               ].map((link) => (
                 <Link
                   key={link.path}

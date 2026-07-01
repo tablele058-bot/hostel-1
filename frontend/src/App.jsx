@@ -18,6 +18,16 @@ import Rooms from "./pages/seller/Rooms";
 import Tenants from "./pages/seller/Tenants";
 import Staff from "./pages/seller/Staff";
 import Reports from "./pages/seller/Reports";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+
+function ProtectedRoute({ children, allowedRoles }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
+  return children;
+}
 
 function AppContent() {
   const { user } = useAuth();
@@ -39,18 +49,20 @@ function AppContent() {
         <Route path="/properties" element={<Properties />} />
         <Route path="/property/:id" element={<PropertyDetails />} />
         <Route path="/contact" element={<Contact />} />
-        <Route path="/dashboard" element={<SellerDashboard />} />
-        <Route path="/add-property" element={<AddProperty />} />
-        <Route path="/edit-property/:id" element={<EditProperty />} />
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
-        <Route path="/wishlist" element={<Wishlist />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/rooms" element={<Rooms />} />
-        <Route path="/tenants" element={<Tenants />} />
-        <Route path="/staff" element={<Staff />} />
-        <Route path="/reports" element={<Reports />} />
+        <Route path="/profile" element={<ProtectedRoute allowedRoles={["viewer", "owner", "admin"]}><Profile /></ProtectedRoute>} />
+        <Route path="/wishlist" element={<ProtectedRoute allowedRoles={["viewer"]}><Wishlist /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["owner"]}><SellerDashboard /></ProtectedRoute>} />
+        <Route path="/add-property" element={<ProtectedRoute allowedRoles={["owner"]}><AddProperty /></ProtectedRoute>} />
+        <Route path="/edit-property/:id" element={<ProtectedRoute allowedRoles={["owner"]}><EditProperty /></ProtectedRoute>} />
+        <Route path="/rooms" element={<ProtectedRoute allowedRoles={["owner"]}><Rooms /></ProtectedRoute>} />
+        <Route path="/tenants" element={<ProtectedRoute allowedRoles={["owner"]}><Tenants /></ProtectedRoute>} />
+        <Route path="/staff" element={<ProtectedRoute allowedRoles={["owner"]}><Staff /></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute allowedRoles={["owner"]}><Reports /></ProtectedRoute>} />
+        <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/users" element={<ProtectedRoute allowedRoles={["admin"]}><AdminUsers /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>
