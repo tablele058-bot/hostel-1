@@ -26,19 +26,19 @@ const api = {
   async get(url, config) {
     await ensureBackendCheck();
     if (backendAvailable === false) {
-      const path = url.replace("/api", "");
-      if (path === "/property" || path.startsWith("/property?")) {
-        const params = config?.params ? new URLSearchParams(config.params).toString() : "";
-        return mockApi.getProperties(params);
+      const [basePath, queryString] = url.replace("/api", "").split("?");
+      if (basePath === "/property") {
+        const params = config?.params ? new URLSearchParams(config.params).toString() : (queryString || "");
+        return mockApi.getProperties(params || "");
       }
-      if (path.startsWith("/property/") && !path.includes("?")) {
-        const id = path.split("/").pop();
+      if (basePath.startsWith("/property/") && !queryString) {
+        const id = basePath.split("/").pop();
         return mockApi.getProperty(id);
       }
-      if (path === "/property/counts") {
+      if (basePath === "/property/counts") {
         return mockApi.getCounts();
       }
-      if (path === "/auth/profile") {
+      if (basePath === "/auth/profile") {
         const token = config?.headers?.Authorization?.replace("Bearer ", "");
         return mockApi.getProfile(token);
       }

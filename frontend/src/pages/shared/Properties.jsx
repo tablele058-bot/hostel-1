@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { HiMagnifyingGlass, HiXMark, HiOutlineHome } from "react-icons/hi2";
-import axios from "axios";
-import { API_URL } from "../../config";
 import { useAuth } from "../../context/AuthContext";
-import { mockApi } from "../../mockApi";
+import api from "../../api";
 import PropertyCard from "../../components/common/PropertyCard";
 import { propertiesStyles as s } from "../../assets/dummyStyles";
 import { HiAdjustments, HiOutlineViewGrid, HiOutlineMenuAlt2 } from "react-icons/hi";
@@ -57,15 +55,11 @@ const Properties = () => {
       if (currentFilters.furnishing && currentFilters.furnishing.length > 0) params.append("furnishing", currentFilters.furnishing.join(","));
       if (currentFilters.sort) params.append("sort", currentFilters.sort);
 
-      const res = await axios.get(`${API_URL}/api/property?${params.toString()}`);
-      setProperties(res.data?.properties || res.data || []);
-    } catch (err) {
-      try {
-        const res = await mockApi.getProperties(currentFilters);
-        setProperties(res.data?.properties || []);
-      } catch {
-        setError("Failed to load properties. Please verify backend connection.");
-      }
+      const res = await api.get(`/api/property?${params.toString()}`);
+      const data = res.data?.properties || res.data;
+      setProperties(Array.isArray(data) ? data : []);
+    } catch {
+      setError("Failed to load properties. Please verify backend connection.");
     } finally {
       setLoading(false);
     }
@@ -77,9 +71,12 @@ const Properties = () => {
 
   useEffect(() => {
     if (token) {
-      axios.get(`${API_URL}/api/wishlist`, { headers: { Authorization: `Bearer ${token}` } })
-        .then(res => setWishlistedIds(res.data.map((p) => String(p.property?._id || p._id))))
-        .catch(() => console.error("Failed to fetch wishlist"));
+      api.get("/api/wishlist", { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => {
+          const list = res.data || [];
+          if (Array.isArray(list)) setWishlistedIds(list.map((p) => String(p.property?._id || p._id)));
+        })
+        .catch(() => {});
     }
   }, [token]);
 
@@ -87,15 +84,13 @@ const Properties = () => {
     if (!token) return navigate("/login");
     try {
       if (wishlistedIds.includes(String(propertyId))) {
-        await axios.delete(`${API_URL}/api/wishlist/${propertyId}`, { headers: { Authorization: `Bearer ${token}` } });
+        await api.delete(`/api/wishlist/${propertyId}`, { headers: { Authorization: `Bearer ${token}` } });
         setWishlistedIds((prev) => prev.filter((id) => id !== String(propertyId)));
       } else {
-        await axios.post(`${API_URL}/api/wishlist`, { propertyId }, { headers: { Authorization: `Bearer ${token}` } });
+        await api.post("/api/wishlist", { propertyId }, { headers: { Authorization: `Bearer ${token}` } });
         setWishlistedIds((prev) => [...prev, String(propertyId)]);
       }
-    } catch (err) {
-      console.error("Failed to toggle wishlist");
-    }
+    } catch {}
   };
 
   return (
